@@ -1,6 +1,10 @@
+print("Loading all modules ...")
+print("This will take a few seconds, please wait ...")
+
+
 from numba import njit, prange
 from numpy import arange, array, cos, r_, pi, sin, sqrt, vstack, zeros
-from os import environ
+from os import environ, path
 import pygame as pg
 from random import random
 from screeninfo import get_monitors
@@ -41,7 +45,10 @@ def generate_terrain(player_x, terrain):
             new_track = None
 
             if current_x % obstacle_spacing == 0:
-                new_track = array([1] + [1 if random() < obstacle_probability else 0 for _ in range(track_breadth)] + [1])
+                while True:
+                    new_track = array([1] + [1 if random() < obstacle_probability else 0 for _ in range(track_breadth)] + [1])
+                    if 0 in new_track:
+                        break
             else:
                 new_track = array([1] + [0 for _ in range(track_breadth)] + [1])
 
@@ -55,7 +62,7 @@ def get_player_speed(distance):
     return player_base_speed + (max_additional_speed * distance ** 2) / (half_maximum ** 2 + distance ** 2)
 
 
-def gameloop(screen):
+def gameloop(screen, num_plays):
     global res_downscale, res, dtheta
 
     dt = 1.0 / ideal_fps
@@ -75,7 +82,11 @@ def gameloop(screen):
         [1 for _ in range(track_breadth + 2)]
     ])
 
-    for _ in range(200):
+    if num_plays == 0:
+        empty_ahead = 200
+    else:
+        empty_ahead = 50
+    for _ in range(empty_ahead):
         terrain = vstack((terrain, [1] + [0 for _ in range(track_breadth)] + [1]))
 
     distances = zeros(screen_width)
@@ -84,8 +95,9 @@ def gameloop(screen):
     left_text = font.render("Left", True, pg.Color("black"))
     right_text = font.render("Right", True, pg.Color("black"))
 
-    pg.mixer.music.load("bg_music.mp3")
+    pg.mixer.music.load(path.join("assets", "bg_music.mp3"))
     timer = 0
+    detection = True
 
     # hand detection model
     mpHands = mp.solutions.hands
@@ -113,24 +125,24 @@ def gameloop(screen):
         # move player forward
         player_x += get_player_speed(player_x) * dt
 
-        # input from hands
-        success, img = cap.read()
-        img = cv2.flip(img, 1)
-        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = hands.process(imgRGB)
+        if detection:
+            success, img = cap.read()
+            img = cv2.flip(img, 1)
+            imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            results = hands.process(imgRGB)
 
-        label = None
-        if results.multi_hand_landmarks:
-            if len(results.multi_handedness) == 2:
-                pass
-            else:
-                for i in results.multi_handedness:
-                    # Return whether it is Right or Left Hand
-                    label = MessageToDict(i)['classification'][0]['label']
-                    if label == 'Left':
-                        player_y -= player_move_speed * dt
-                    if label == 'Right':
-                        player_y += player_move_speed * dt
+            label = None
+            if results.multi_hand_landmarks:
+                if len(results.multi_handedness) == 2:
+                    pass
+                else:
+                    for i in results.multi_handedness:
+                        # Return whether it is Right or Left Hand
+                        label = MessageToDict(i)['classification'][0]['label']
+                        if label == 'Left':
+                            player_y -= player_move_speed * dt
+                        if label == 'Right':
+                            player_y += player_move_speed * dt
 
         # constrain player to track
         if player_y < 1.5:
@@ -140,7 +152,7 @@ def gameloop(screen):
 
         # game over
         if terrain[int(player_x)][int(player_y)] == 1:
-            print("Game Over")
+            pg.mixer.music.stop()
             return
 
         terrain = generate_terrain(player_x, terrain)
@@ -180,7 +192,9 @@ def gameloop(screen):
         if timer > 5 and not pg.mixer.music.get_busy():
             pg.mixer.music.play(-1)
 
-        cv2.imshow('Input Feed', img)
+        if detection:
+            cv2.imshow('Input Feed', img)
+        detection = not detection
 
 
 if __name__ == '__main__':
@@ -201,37 +215,43 @@ if __name__ == '__main__':
     clock = pg.time.Clock()
     screen = pg.display.set_mode((pygame_window_width, pygame_window_height))
     screen_width, screen_height = screen.get_size()
+
+    # difficulty parameters
+    player_base_speed = 10
+    max_additional_speed = 20
+    half_maximum = 1000
+
+    # display parameters
+    ideal_fps = 60
+    res_downscale = 4
+    fov = pi / 4
+    increment = 0.05
+    height_multiplier = 500
+    render_distance = 20
+    res = screen_width // res_downscale
+    dtheta = fov / res
+
+    # shaders
+    shader_min = 80
+    shader_interval = 255 - shader_min
+    shader_pow = 0.5
+
+    # gameplay parameters
+    track_breadth = 7
+    obstacle_spacing = 30
+    obstacle_probability = 0.6
+    generate_ahead = 225
     
-    start_game = menu(screen, cap)
+    num_plays = 0
+    while True:
+        start_game = menu(screen, cap, num_plays)
 
-    if start_game:
-        # difficulty parameters
-        player_base_speed = 10
-        max_additional_speed = 20
-        half_maximum = 1000
+        if start_game:
+            pg.mouse.set_visible(False)
+            gameloop(screen, num_plays)
+        else:
+            pg.quit()
+            break
 
-        # display parameters
-        ideal_fps = 60
-        res_downscale = 4
-        fov = pi / 4
-        increment = 0.05
-        height_multiplier = 500
-        render_distance = 20
-        res = screen_width // res_downscale
-        dtheta = fov / res
-
-        # shaders
-        shader_min = 80
-        shader_interval = 255 - shader_min
-        shader_pow = 0.5
-
-        # gameplay parameters
-        track_breadth = 7
-        obstacle_spacing = 30
-        obstacle_probability = 0.6
-        generate_ahead = 200
-
-        pg.mouse.set_visible(False)
-        gameloop(screen)
-    else:
-        pg.quit()
+        pg.mouse.set_visible(True)
+        num_plays += 1

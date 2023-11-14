@@ -1,4 +1,5 @@
 import pygame as pg
+from os import path
 
 import cv2
 import mediapipe as mp
@@ -8,20 +9,23 @@ from button import Button
 from text import Text
 
 
-def menu(screen, cap):
+def menu(screen, cap, num_plays):
     screen_width, screen_height = screen.get_size()
     bg_color = pg.Color("#222222")
 
-    title_font = pg.font.Font("orbitron-regular.ttf", 40)
+    title_font = pg.font.Font(path.join("assets", "Orbitron-Regular.ttf"), 40)
     title = Text(screen_width // 2, 30, "Infinity Run", screen)
     title.set_font(title_font)
 
-    instructions_image = pg.image.load("instructions.png")
+    instructions_image = pg.image.load(path.join("assets", "instructions.png"))
 
     detected_text = Text(screen_width // 2, 400, "Detected:", screen)
     detected_text.set_font(title_font)
 
-    play_button = Button(screen_width // 2, 500, 200, 50, screen, "Play")
+    if num_plays == 0:
+        play_button = Button(screen_width // 2, 500, 200, 50, screen, "Play")
+    else:
+        play_button = Button(screen_width // 2, 500, 200, 50, screen, "Play Again")
     quit_button = Button(screen_width // 2, 600, 200, 50, screen, "Quit")
 
     mpHands = mp.solutions.hands
