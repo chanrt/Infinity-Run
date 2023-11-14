@@ -1,14 +1,17 @@
 from numba import njit, prange
 from numpy import arange, array, cos, r_, pi, sin, sqrt, vstack, zeros
-from random import random
 from os import environ
-from screeninfo import get_monitors
 import pygame as pg
+from random import random
+from screeninfo import get_monitors
 
 # hand detection
 import cv2
 import mediapipe as mp
 from google.protobuf.json_format import MessageToDict
+
+# my scripts
+from menu import menu
 
 
 @njit
@@ -72,7 +75,7 @@ def gameloop(screen):
         [1 for _ in range(track_breadth + 2)]
     ])
 
-    for _ in range(50):
+    for _ in range(200):
         terrain = vstack((terrain, [1] + [0 for _ in range(track_breadth)] + [1]))
 
     distances = zeros(screen_width)
@@ -177,11 +180,12 @@ def gameloop(screen):
         if timer > 5 and not pg.mixer.music.get_busy():
             pg.mixer.music.play(-1)
 
-        cv2.imshow('Image', img)
+        cv2.imshow('Input Feed', img)
 
 
 if __name__ == '__main__':
-    monitor_width, monitor_height = get_monitors()[0].width, get_monitors()[0].height  
+    monitor_params = get_monitors()[0]
+    monitor_width, monitor_height = monitor_params.width, monitor_params.height  
 
     cap = cv2.VideoCapture(0)
     r, frame = cap.read()
@@ -197,32 +201,37 @@ if __name__ == '__main__':
     clock = pg.time.Clock()
     screen = pg.display.set_mode((pygame_window_width, pygame_window_height))
     screen_width, screen_height = screen.get_size()
-    pg.mouse.set_visible(False)
+    
+    start_game = menu(screen, cap)
 
-    # difficulty parameters
-    player_base_speed = 10
-    max_additional_speed = 20
-    half_maximum = 1000
+    if start_game:
+        # difficulty parameters
+        player_base_speed = 10
+        max_additional_speed = 20
+        half_maximum = 1000
 
-    # display parameters
-    ideal_fps = 60
-    res_downscale = 2
-    fov = pi / 4
-    increment = 0.02
-    height_multiplier = 500
-    render_distance = 20
-    res = screen_width // res_downscale
-    dtheta = fov / res
+        # display parameters
+        ideal_fps = 60
+        res_downscale = 4
+        fov = pi / 4
+        increment = 0.05
+        height_multiplier = 500
+        render_distance = 20
+        res = screen_width // res_downscale
+        dtheta = fov / res
 
-    # shaders
-    shader_min = 80
-    shader_interval = 255 - shader_min
-    shader_pow = 0.5
+        # shaders
+        shader_min = 80
+        shader_interval = 255 - shader_min
+        shader_pow = 0.5
 
-    # gameplay parameters
-    track_breadth = 7
-    obstacle_spacing = 30
-    obstacle_probability = 0.6
-    generate_ahead = 200
+        # gameplay parameters
+        track_breadth = 7
+        obstacle_spacing = 30
+        obstacle_probability = 0.6
+        generate_ahead = 200
 
-    gameloop(screen)
+        pg.mouse.set_visible(False)
+        gameloop(screen)
+    else:
+        pg.quit()
