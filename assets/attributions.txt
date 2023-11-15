@@ -1,3 +1,4 @@
 Background music by Lena Orsa and Nick Orsa
 Fonts from Google Fonts
 Reference for hand detection: https://www.geeksforgeeks.org/right-and-left-hand-detection-using-python/
+The button and text objects are from my GitHub repository: https://github.com/chanrt/pygame-ui

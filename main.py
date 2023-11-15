@@ -16,6 +16,7 @@ from google.protobuf.json_format import MessageToDict
 
 # my scripts
 from menu import menu
+from text import Text
 
 
 @njit
@@ -72,6 +73,11 @@ def gameloop(screen, num_plays):
     sky_color = pg.Color('#92b4f4')
     wall_color = pg.Color("#dd1c1a")
 
+    title_font = pg.font.Font(path.join("assets", "Orbitron-Regular.ttf"), 40)
+    title = Text(screen_width // 2, 30, "Infinity Run", screen)
+    title.set_text_color(pg.Color("black"))
+    title.set_font(title_font)
+
     # player params
     player_x = 1
     player_y = 2.5
@@ -91,9 +97,10 @@ def gameloop(screen, num_plays):
 
     distances = zeros(screen_width)
     
-    font = pg.font.SysFont("Arial", 30)
-    left_text = font.render("Left", True, pg.Color("black"))
-    right_text = font.render("Right", True, pg.Color("black"))
+    small_font = pg.font.SysFont("Arial", 30)
+    big_font = pg.font.SysFont("Arial", 50)
+    left_text = big_font.render("Left", True, pg.Color("black"))
+    right_text = big_font.render("Right", True, pg.Color("black"))
 
     pg.mixer.music.load(path.join("assets", "bg_music.mp3"))
     timer = 0
@@ -111,16 +118,18 @@ def gameloop(screen, num_plays):
     while True:
         clock.tick(ideal_fps)
 
-        keys_pressed = pg.key.get_pressed()
         for event in pg.event.get():
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
+                    exit_loop()
                     return
 
             if event.type == pg.QUIT:
+                exit_loop()
                 return
         if cv2.waitKey(1) & 0xff == ord('q'):
-            break
+            exit_loop()
+            return
             
         # move player forward
         player_x += get_player_speed(player_x) * dt
@@ -151,8 +160,8 @@ def gameloop(screen, num_plays):
             player_y = track_breadth + 0.5
 
         # game over
-        if terrain[int(player_x)][int(player_y)] == 1:
-            pg.mixer.music.stop()
+        if int(player_x) < len(terrain) and terrain[int(player_x)][int(player_y)] == 1:
+            exit_loop()
             return
 
         terrain = generate_terrain(player_x, terrain)
@@ -179,13 +188,14 @@ def gameloop(screen, num_plays):
         timer += dt
 
         current_fps = clock.get_fps()
-        fps_text = font.render(str(int(current_fps)), True, pg.Color("black"))
+        fps_text = small_font.render("FPS: " + str(int(current_fps)), True, pg.Color("black"))
         screen.blit(fps_text, (0, 0))
 
         if label == 'Left':
             screen.blit(left_text, (screen_width // 2 - 100, screen_height // 2))
         if label == 'Right':
             screen.blit(right_text, (screen_width // 2 + 100, screen_height // 2))
+        title.render()
 
         pg.display.flip()
 
@@ -195,6 +205,10 @@ def gameloop(screen, num_plays):
         if detection:
             cv2.imshow('Input Feed', img)
         detection = not detection
+
+
+def exit_loop():
+    pg.mixer.music.stop()
 
 
 if __name__ == '__main__':
@@ -212,6 +226,7 @@ if __name__ == '__main__':
     environ['SDL_VIDEO_WINDOW_POS'] = '%d,%d' % (webcam_width + padding, padding)
 
     pg.init()
+    pg.display.init()
     clock = pg.time.Clock()
     screen = pg.display.set_mode((pygame_window_width, pygame_window_height))
     screen_width, screen_height = screen.get_size()
